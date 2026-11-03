@@ -2,6 +2,7 @@
 declare(strict_types=1);
 
 require __DIR__ . '/app/bootstrap.php';
+require __DIR__ . '/app/cart.php';
 
 $slug = isset($_GET['slug']) && is_string($_GET['slug']) ? trim($_GET['slug']) : '';
 $statement = db()->prepare(
@@ -18,39 +19,23 @@ if (!$product) {
     http_response_code(404);
 }
 
-$notice = $_SESSION['cart_notice'] ?? null;
-$noticeType = $_SESSION['cart_notice_type'] ?? 'success';
-unset($_SESSION['cart_notice'], $_SESSION['cart_notice_type']);
-
 if ($product && $_SERVER['REQUEST_METHOD'] === 'POST') {
     verify_csrf();
     $quantity = filter_var($_POST['quantity'] ?? null, FILTER_VALIDATE_INT);
-    $cart = $_SESSION['cart'] ?? [];
-    $alreadyInCart = (int) ($cart[(int) $product['id']] ?? 0);
 
     if ($quantity === false || $quantity < 1) {
-        $notice = 'Choose a valid quantity.';
-        $noticeType = 'error';
-    } elseif ((int) $product['stock'] < 1) {
-        $notice = 'This product is currently out of stock.';
-        $noticeType = 'error';
-    } elseif ($alreadyInCart + $quantity > (int) $product['stock']) {
-        $available = max(0, (int) $product['stock'] - $alreadyInCart);
-        $notice = $available > 0
-            ? "Only {$available} more can be added to your cart."
-            : 'Your cart already has all available stock of this product.';
-        $noticeType = 'error';
+        cart_notice('Choose a valid quantity.', 'error');
     } else {
-        $_SESSION['cart'][(int) $product['id']] = $alreadyInCart + $quantity;
-        $notice = $product['name'] . ' added to your cart.';
-        $noticeType = 'success';
+        cart_add((int) $product['id'], $quantity);
     }
 
-    $_SESSION['cart_notice'] = $notice;
-    $_SESSION['cart_notice_type'] = $noticeType;
     header('Location: ' . url('product.php') . '?slug=' . rawurlencode($product['slug']), true, 303);
     exit;
 }
+
+$notice = $_SESSION['cart_notice'] ?? null;
+$noticeType = $_SESSION['cart_notice_type'] ?? 'success';
+unset($_SESSION['cart_notice'], $_SESSION['cart_notice_type']);
 
 $pageTitle = $product ? $product['name'] : 'Product not found';
 require __DIR__ . '/partials/header.php';

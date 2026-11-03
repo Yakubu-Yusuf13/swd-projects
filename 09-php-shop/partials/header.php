@@ -1,6 +1,8 @@
 <?php
+require_once __DIR__ . '/../app/cart.php';
+
 $pageTitle = $pageTitle ?? 'Everyday Shop';
-$cartCount = array_sum(array_map('intval', $_SESSION['cart'] ?? []));
+$cartCount = cart_count();
 ?>
 <!doctype html>
 <html lang="en">
@@ -20,7 +22,7 @@ $cartCount = array_sum(array_map('intval', $_SESSION['cart'] ?? []));
         </a>
         <nav class="main-nav" aria-label="Main navigation">
             <a href="<?= e(url()) ?>">Shop</a>
-            <a class="cart-link" href="<?= e(url()) ?>#products">
+            <a class="cart-link" href="<?= e(url('cart.php')) ?>">
                 Cart <span class="cart-badge" aria-label="<?= $cartCount ?> items"><?= $cartCount ?></span>
             </a>
         </nav>
