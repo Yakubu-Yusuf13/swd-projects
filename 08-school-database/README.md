@@ -8,9 +8,10 @@ The schema targets MySQL 8.0.16+ or a MariaDB version that enforces `CHECK` cons
 cd /d "C:\xampp\htdocs\swd projects\08-school-database"
 C:\xampp\mysql\bin\mysql.exe -u root < schema.sql
 C:\xampp\mysql\bin\mysql.exe -u root < seed.sql
+C:\xampp\mysql\bin\mysql.exe -u root < queries.sql
 ```
 
-`schema.sql` drops and recreates the school tables, so back up any data you need before re-running it. `seed.sql` is intended to run once after the schema; it adds fictional sample data for 3 classes, 8 subjects, 6 teachers, 30 students, 1 term, 240 results, and 150 attendance records.
+`schema.sql` drops and recreates the school tables, so back up any data you need before re-running it. `seed.sql` is intended to run once after the schema; it adds fictional sample data for 3 classes, 8 subjects, 6 teachers, 30 students, 1 term, 240 results, and 150 attendance records. `queries.sql` contains eight numbered business queries and creates or replaces the `v_student_results` and `v_class_summary` views. Its ranking examples use window functions; a correlated-subquery fallback is included for MySQL versions without them.
 
 ## 1. Entities, attributes, keys, and relationships
 
