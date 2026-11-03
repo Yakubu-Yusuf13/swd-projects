@@ -22,6 +22,7 @@ $cartCount = cart_count();
         </a>
         <nav class="main-nav" aria-label="Main navigation">
             <a href="<?= e(url()) ?>">Shop</a>
+            <a href="<?= e(url('order-lookup.php')) ?>">Track order</a>
             <a class="cart-link" href="<?= e(url('cart.php')) ?>">
                 Cart <span class="cart-badge" aria-label="<?= $cartCount ?> items"><?= $cartCount ?></span>
             </a>

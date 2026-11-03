@@ -30,7 +30,8 @@ CREATE TABLE orders (
   address TEXT NOT NULL,
   total DECIMAL(12,2) NOT NULL,
   status ENUM('pending','paid','shipped','delivered','cancelled') NOT NULL DEFAULT 'pending',
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  KEY idx_orders_status_created_at (status, created_at)
 ) ENGINE=InnoDB;
 
 CREATE TABLE order_items (
@@ -41,7 +42,8 @@ CREATE TABLE order_items (
   quantity INT UNSIGNED NOT NULL CHECK (quantity > 0),
   PRIMARY KEY (order_id, product_id),
   FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE,
-  FOREIGN KEY (product_id) REFERENCES products(id)
+  FOREIGN KEY (product_id) REFERENCES products(id),
+  KEY idx_order_items_product_id (product_id)
 ) ENGINE=InnoDB;
 
 INSERT INTO categories (name, slug) VALUES ('Phones','phones'),('Laptops','laptops'),('Accessories','accessories');

@@ -6,6 +6,9 @@ if (session_status() !== PHP_SESSION_ACTIVE) {
 }
 
 $scriptDirectory = str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'] ?? ''));
+if (basename($scriptDirectory) === 'admin') {
+    $scriptDirectory = str_replace('\\', '/', dirname($scriptDirectory));
+}
 define('BASE_URL', $scriptDirectory === '/' || $scriptDirectory === '.' ? '' : rtrim($scriptDirectory, '/'));
 
 function db(): PDO
