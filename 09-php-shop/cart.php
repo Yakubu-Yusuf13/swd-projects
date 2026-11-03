@@ -120,11 +120,7 @@ require __DIR__ . '/partials/header.php';
                 <h2 id="summary-title">Order summary</h2>
                 <div class="summary-row"><span>Subtotal</span><strong><?= e(money($total)) ?></strong></div>
                 <p class="summary-note">Shipping and any applicable charges are calculated at checkout.</p>
-                <form method="post" action="<?= e(url('cart.php')) ?>">
-                    <?= csrf_field() ?>
-                    <input type="hidden" name="action" value="checkout">
-                    <button class="button checkout-button" type="submit">Proceed to checkout</button>
-                </form>
+                <a class="button checkout-button" href="<?= e(url('checkout.php')) ?>">Proceed to checkout</a>
             </aside>
         </div>
     <?php endif; ?>
