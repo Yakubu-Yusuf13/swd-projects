@@ -9,8 +9,13 @@ USE swd_school;
 -- Remove guards before their referenced tables so this file can be re-run.
 DROP TRIGGER IF EXISTS trg_results_validate_match_before_insert;
 DROP TRIGGER IF EXISTS trg_results_validate_match_before_update;
+DROP PROCEDURE IF EXISTS sp_record_result;
+DROP PROCEDURE IF EXISTS sp_transfer_student_checked;
+DROP VIEW IF EXISTS v_class_summary;
+DROP VIEW IF EXISTS v_student_results;
 
 -- Drop child tables before parents to respect foreign-key dependencies.
+DROP TABLE IF EXISTS class_transfers;
 DROP TABLE IF EXISTS results;
 DROP TABLE IF EXISTS attendance;
 DROP TABLE IF EXISTS class_subject_offerings;

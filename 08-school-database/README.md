@@ -2,16 +2,59 @@
 
 ## Running the SQL files
 
-The schema targets MySQL 8.0.16+ or a MariaDB version that enforces `CHECK` constraints. From Command Prompt, run:
+The schema targets MySQL 8.0.16+ or a MariaDB version that enforces `CHECK` constraints. From Command Prompt, run these files in order:
 
 ```bat
 cd /d "C:\xampp\htdocs\swd projects\08-school-database"
 C:\xampp\mysql\bin\mysql.exe -u root < schema.sql
 C:\xampp\mysql\bin\mysql.exe -u root < seed.sql
+C:\xampp\mysql\bin\mysql.exe -u root < indexes.sql
 C:\xampp\mysql\bin\mysql.exe -u root < queries.sql
+C:\xampp\mysql\bin\mysql.exe -u root < procedures.sql
+C:\xampp\mysql\bin\mysql.exe -u root < transactions.sql
 ```
 
-`schema.sql` drops and recreates the school tables, so back up any data you need before re-running it. `seed.sql` is intended to run once after the schema; it adds fictional sample data for 3 classes, 8 subjects, 6 teachers, 30 students, 1 term, 240 results, and 150 attendance records. `queries.sql` contains eight numbered business queries and creates or replaces the `v_student_results` and `v_class_summary` views. Its ranking examples use window functions; a correlated-subquery fallback is included for MySQL versions without them.
+The SQL scripts create/select the `swd_school` database; no separate database setup command is needed. `schema.sql` drops and recreates the school tables, so back up any data you need before re-running it. `seed.sql` is intended to run once after the schema; re-running it will hit unique constraints. It adds fictional sample data for 3 classes, 8 subjects, 6 teachers, 30 students, 1 term, 240 results, and 150 attendance records. The remaining setup scripts can be run again: indexes are created only if missing, views and stored procedures are replaced, and `transactions.sql` creates the audit table and transfer procedure without moving a student unless you deliberately run its example.
+
+## File guide
+
+| File | Purpose |
+|---|---|
+| `README.md` | Requirements, normalized design, ERD, and setup/learning guide. |
+| `schema.sql` | Tables, keys, constraints, foreign-key rules, and result validation triggers. Re-running it drops and recreates school tables. |
+| `seed.sql` | Fictional Nigerian sample data. Run once after `schema.sql`. |
+| `indexes.sql` | Measured indexes for the class/term enrollment lookups and covering attendance reads. Safe to re-run. |
+| `queries.sql` | Eight numbered business questions and SQL examples; creates `v_student_results` and `v_class_summary`. |
+| `procedures.sql` | `sp_record_result(student_id, subject_id, term_id, ca_score, exam_score)`, which validates enrollment, class offering, and score ranges, then inserts or updates a result. |
+| `transactions.sql` | `class_transfers` audit table, a commented manual transaction example, and `sp_transfer_student_checked`. The procedure rejects transfers after results exist so existing results cannot be left associated with the wrong class. |
+
+### Three useful query techniques
+
+These are a teaching selection from `queries.sql`:
+
+1. **Query 3 — class ranking:** First aggregate subject scores into each student's term average, then use `RANK() OVER (PARTITION BY class_id, term_id ORDER BY average_score DESC)`. Partitioning restarts the rank in each class and term; ties share a rank. A correlated-subquery version is provided for older MySQL releases without window functions.
+2. **Query 5 — aggregate filtering with `HAVING`:** A conditional `SUM(CASE ...)` counts each student's subjects below 40. `HAVING` filters groups by that count (at least two), whereas `WHERE` filters individual rows before grouping.
+3. **Query 7 — attendance percentage:** A `LEFT JOIN` keeps enrolled students who have no attendance rows, and a derived table calculates the percentage before the outer query filters below 80%. `present` and `late` count as attended. The denominator is recorded attendance days, not the term calendar, because this design has no school-day calendar table.
+
+### Query plans and indexes
+
+`EXPLAIN` was run on Queries 3, 5, and 7 before and after `indexes.sql` on the sample MariaDB 10.4.32 database. `type` is the join/access method (`const` and `eq_ref` are efficient point lookups; `ref` is a non-unique indexed lookup; `index` scans an index; `ALL` scans a table or derived result). `key` names the chosen index, and `rows` is the optimizer's estimated rows to examine, not a measured count.
+
+| Query / table | Before: type, key, rows | After: type, key, rows | What changed |
+|---|---|---|---|
+| 3 and 5 — `enrollments` | `ref`, `fk_enrollments_class`, 5 | `ref`, `idx_enrollments_class_term_student`, 5 | The composite index uses both `class_id` and `term_id` (`key_len` increased from 4 to 8) and covers `student_id`; row estimates stay at 5 on this tiny sample. |
+| 3 and 5 — `results` | `ref`, `PRIMARY`, 4 | `ref`, `PRIMARY`, 4 | The existing primary key already supports lookup by the leading `enrollment_id`; another index would add storage/write cost without improving this access path. |
+| 7 — `attendance` | `ref`, `uq_attendance_student_day`, 2; `Using where` | `ref`, `idx_attendance_student_date_status`, 2; `Using where; Using index` | The new index covers `status`, avoiding attendance-row lookups. MariaDB still estimates two rows and applies the date condition as a residual filter in this joined-range plan. |
+
+These `rows` values are estimates for the 30-student sample and are too small to demonstrate elapsed-time gains. The indexes improve the access path/covering behavior; on production-sized data, compare plans and timings again. `EXPLAIN` itself does not execute the query.
+
+## Exporting the full database in phpMyAdmin
+
+1. Open phpMyAdmin (for XAMPP, usually `http://localhost/phpmyadmin`) and select the `swd_school` database in the left navigation.
+2. Open **Export**, choose **Custom** and **SQL** so you can select the complete export options.
+3. Select all tables. Enable the options to export structure and data; include views, triggers, and routines if those options are shown.
+4. Choose **Save output to a file**, keep the SQL format, and click **Go**. Save the downloaded file as `database.sql`.
+5. To restore it, select a target database in phpMyAdmin, open **Import**, choose `database.sql`, and click **Go**. Review the export before sharing it because it contains student and guardian data.
 
 ## 1. Entities, attributes, keys, and relationships
 
