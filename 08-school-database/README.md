@@ -1,5 +1,17 @@
 # Secondary School Database Design
 
+## Running the SQL files
+
+The schema targets MySQL 8.0.16+ or a MariaDB version that enforces `CHECK` constraints. From Command Prompt, run:
+
+```bat
+cd /d "C:\xampp\htdocs\swd projects\08-school-database"
+C:\xampp\mysql\bin\mysql.exe -u root < schema.sql
+C:\xampp\mysql\bin\mysql.exe -u root < seed.sql
+```
+
+`schema.sql` drops and recreates the school tables, so back up any data you need before re-running it. `seed.sql` is intended to run once after the schema; it adds fictional sample data for 3 classes, 8 subjects, 6 teachers, 30 students, 1 term, 240 results, and 150 attendance records.
+
 ## 1. Entities, attributes, keys, and relationships
 
 The design treats a student's class assignment as term-specific enrollment rather than a permanent attribute of the student. This preserves class history as students advance.
