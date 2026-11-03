@@ -56,6 +56,10 @@ These `rows` values are estimates for the 30-student sample and are too small to
 4. Choose **Save output to a file**, keep the SQL format, and click **Go**. Save the downloaded file as `database.sql`.
 5. To restore it, select a target database in phpMyAdmin, open **Import**, choose `database.sql`, and click **Go**. Review the export before sharing it because it contains student and guardian data.
 
+## Static demo deployment
+
+The repository root contains `vercel.json`, which configures Vercel to serve the static `public/` directory. Import the GitHub repository into Vercel, keep the project root at the repository root, and deploy with no build command. The demo is a read-only documentation page and does not connect to the MySQL database.
+
 ## 1. Entities, attributes, keys, and relationships
 
 The design treats a student's class assignment as term-specific enrollment rather than a permanent attribute of the student. This preserves class history as students advance.

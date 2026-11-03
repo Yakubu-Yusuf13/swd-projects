@@ -1,0 +1,521 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#102a2a">
+  <meta name="description" content="A practical MySQL and MariaDB secondary-school database design, with an ERD, sample data, reporting queries, indexes, and transaction examples.">
+  <title>Schoolbase — Secondary School Database</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #152b29;
+      --muted: #62706a;
+      --paper: #f7f6f0;
+      --surface: #fffefa;
+      --green: #245c4b;
+      --green-dark: #102a2a;
+      --lime: #d6e28a;
+      --line: #e6e5dc;
+      --orange: #e38b58;
+      --shadow: 0 16px 42px rgba(21, 43, 41, .08);
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      background: var(--paper);
+      color: var(--ink);
+      font: 16px/1.65 "Segoe UI", Arial, sans-serif;
+    }
+
+    a { color: inherit; }
+    .wrap { width: min(1120px, calc(100% - 40px)); margin-inline: auto; }
+    .topbar {
+      position: sticky;
+      z-index: 3;
+      top: 0;
+      border-bottom: 1px solid rgba(255,255,255,.12);
+      background: var(--green-dark);
+      color: #fffefa;
+    }
+    .topbar-inner {
+      display: flex;
+      min-height: 68px;
+      align-items: center;
+      justify-content: space-between;
+      gap: 24px;
+    }
+    .brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 11px;
+      color: inherit;
+      font-size: 15px;
+      font-weight: 750;
+      letter-spacing: .02em;
+      text-decoration: none;
+    }
+    .brand-mark {
+      display: grid;
+      width: 35px;
+      height: 35px;
+      place-items: center;
+      border-radius: 11px;
+      background: var(--lime);
+      color: var(--green-dark);
+      font-size: 17px;
+    }
+    nav { display: flex; flex-wrap: wrap; gap: 20px; }
+    nav a {
+      color: #dce5dc;
+      font-size: 13px;
+      text-decoration: none;
+    }
+    nav a:hover, nav a:focus-visible { color: var(--lime); }
+
+    .hero {
+      overflow: hidden;
+      position: relative;
+      padding: 82px 0 74px;
+      background:
+        radial-gradient(ellipse at 85% 12%, rgba(214,226,138,.16), transparent 34%),
+        var(--green-dark);
+      color: #fffefa;
+    }
+    .hero::after {
+      position: absolute;
+      right: -125px;
+      bottom: -240px;
+      width: 490px;
+      height: 490px;
+      border: 1px solid rgba(214,226,138,.2);
+      border-radius: 50%;
+      content: "";
+      box-shadow: 0 0 0 42px rgba(214,226,138,.035), 0 0 0 84px rgba(214,226,138,.025);
+      pointer-events: none;
+    }
+    .hero-grid {
+      position: relative;
+      z-index: 1;
+      display: grid;
+      align-items: center;
+      grid-template-columns: minmax(0, 1.25fr) minmax(260px, .75fr);
+      gap: 60px;
+    }
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 9px;
+      color: var(--lime);
+      font-size: 12px;
+      font-weight: 750;
+      letter-spacing: .13em;
+      text-transform: uppercase;
+    }
+    .eyebrow::before {
+      width: 23px;
+      height: 1px;
+      background: currentColor;
+      content: "";
+    }
+    h1, h2, h3, p { margin-top: 0; }
+    h1 {
+      max-width: 700px;
+      margin: 20px 0 18px;
+      font-size: clamp(42px, 6vw, 72px);
+      font-weight: 680;
+      letter-spacing: -.055em;
+      line-height: 1.05;
+    }
+    .hero-copy {
+      max-width: 600px;
+      margin-bottom: 28px;
+      color: #c4d2c9;
+      font-size: 17px;
+    }
+    .actions { display: flex; flex-wrap: wrap; gap: 12px; }
+    .button {
+      display: inline-flex;
+      min-height: 45px;
+      align-items: center;
+      justify-content: center;
+      gap: 9px;
+      padding: 0 17px;
+      border: 1px solid rgba(255,255,255,.24);
+      border-radius: 8px;
+      color: #fffefa;
+      font-size: 13px;
+      font-weight: 700;
+      text-decoration: none;
+      transition: transform .18s ease, background .18s ease;
+    }
+    .button:hover { transform: translateY(-2px); background: rgba(255,255,255,.08); }
+    .button.primary { border-color: var(--lime); background: var(--lime); color: var(--green-dark); }
+    .button.primary:hover { background: #e1eba4; }
+    .hero-card {
+      padding: 25px;
+      border: 1px solid rgba(255,255,255,.15);
+      border-radius: 14px;
+      background: rgba(255,255,255,.055);
+      box-shadow: 0 25px 65px rgba(0,0,0,.12);
+      backdrop-filter: blur(8px);
+    }
+    .card-label { color: #b6c8bd; font-size: 11px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; }
+    .hero-card h2 { margin: 8px 0 20px; font-size: 20px; font-weight: 650; letter-spacing: -.02em; }
+    .stat-list { display: grid; grid-template-columns: 1fr 1fr; gap: 18px 12px; }
+    .stat { border-top: 1px solid rgba(255,255,255,.14); padding-top: 12px; }
+    .stat strong { display: block; color: var(--lime); font-size: 25px; letter-spacing: -.04em; }
+    .stat span { color: #c4d2c9; font-size: 12px; }
+
+    main { padding: 64px 0 84px; }
+    section { scroll-margin-top: 90px; }
+    .section-heading {
+      display: flex;
+      align-items: end;
+      justify-content: space-between;
+      gap: 28px;
+      margin-bottom: 26px;
+    }
+    .section-heading h2 {
+      margin: 6px 0 0;
+      font-size: clamp(27px, 4vw, 38px);
+      font-weight: 680;
+      letter-spacing: -.045em;
+      line-height: 1.18;
+    }
+    .section-heading p { max-width: 420px; margin-bottom: 2px; color: var(--muted); font-size: 14px; }
+    .section-tag { color: var(--green); font-size: 11px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
+    .overview-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+    .overview-card, .panel, .table-wrap {
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: var(--surface);
+      box-shadow: var(--shadow);
+    }
+    .overview-card { min-height: 160px; padding: 21px; }
+    .icon {
+      display: grid;
+      width: 35px;
+      height: 35px;
+      margin-bottom: 13px;
+      place-items: center;
+      border-radius: 10px;
+      background: #edf1dc;
+      color: var(--green);
+      font-size: 15px;
+      font-weight: 800;
+    }
+    .overview-card h3 { margin-bottom: 6px; font-size: 15px; }
+    .overview-card p { margin-bottom: 0; color: var(--muted); font-size: 13px; }
+
+    .design { margin-top: 76px; }
+    .panel { padding: 26px; }
+    .erd-grid { display: grid; grid-template-columns: 1.1fr .9fr; gap: 26px; align-items: start; }
+    .erd-grid h3 { margin-bottom: 14px; font-size: 16px; }
+    .entity-list { display: flex; flex-wrap: wrap; gap: 8px; }
+    .entity {
+      padding: 6px 10px;
+      border: 1px solid #dfe5d5;
+      border-radius: 6px;
+      background: #f5f7ec;
+      color: #2a5344;
+      font: 12px/1.4 Consolas, "Courier New", monospace;
+    }
+    .relationship-list { display: grid; gap: 11px; margin: 0; padding: 0; list-style: none; }
+    .relationship-list li { display: flex; gap: 12px; color: var(--muted); font-size: 13px; }
+    .relationship-list b { min-width: 36px; color: var(--green); font: 750 12px/1.8 Consolas, monospace; }
+    .erd-note {
+      margin-top: 20px;
+      padding: 14px 16px;
+      border-left: 3px solid var(--orange);
+      border-radius: 0 7px 7px 0;
+      background: #fff4ea;
+      color: #645348;
+      font-size: 13px;
+    }
+
+    .queries { margin-top: 76px; }
+    .query-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+    .query-card { padding: 22px; }
+    .query-number { color: #82916d; font: 700 12px Consolas, monospace; }
+    .query-card h3 { margin: 9px 0 8px; font-size: 16px; }
+    .query-card p { min-height: 62px; margin-bottom: 14px; color: var(--muted); font-size: 13px; }
+    code {
+      padding: 2px 5px;
+      border-radius: 4px;
+      background: #f0f1e9;
+      color: #315a4b;
+      font: 12px Consolas, "Courier New", monospace;
+    }
+    .technique {
+      display: inline-block;
+      padding: 5px 8px;
+      border-radius: 5px;
+      background: #eaf0e9;
+      color: var(--green);
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: .07em;
+      text-transform: uppercase;
+    }
+
+    .toolkit { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 76px; }
+    .toolkit .panel { box-shadow: none; }
+    .toolkit h3 { margin-bottom: 9px; font-size: 17px; }
+    .toolkit p { margin-bottom: 14px; color: var(--muted); font-size: 13px; }
+    pre {
+      overflow-x: auto;
+      margin: 15px 0 0;
+      padding: 15px;
+      border-radius: 8px;
+      background: #142a29;
+      color: #e5eddb;
+      font: 12px/1.8 Consolas, "Courier New", monospace;
+    }
+    .file-links { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; margin-top: 16px; }
+    .file-link {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 10px 11px;
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      background: #fff;
+      color: var(--green);
+      font: 12px Consolas, "Courier New", monospace;
+      text-decoration: none;
+    }
+    .file-link:hover { border-color: #9eb4a1; background: #f7f9f1; }
+    .file-link span { color: #819087; font: 11px "Segoe UI", Arial, sans-serif; }
+    .grade-row { display: grid; grid-template-columns: repeat(6, 1fr); gap: 7px; margin-top: 16px; }
+    .grade {
+      padding: 8px 6px;
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      text-align: center;
+    }
+    .grade b { display: block; color: var(--green); font-size: 15px; }
+    .grade span { color: var(--muted); font-size: 10px; }
+
+    .export { margin-top: 76px; }
+    .export-list { display: grid; gap: 13px; margin: 0; padding: 0; counter-reset: export; list-style: none; }
+    .export-list li { display: grid; grid-template-columns: 28px 1fr; gap: 11px; color: var(--muted); font-size: 13px; }
+    .export-list li::before {
+      display: grid;
+      width: 25px;
+      height: 25px;
+      place-items: center;
+      border-radius: 50%;
+      background: #edf1dc;
+      color: var(--green);
+      content: counter(export);
+      counter-increment: export;
+      font-size: 11px;
+      font-weight: 800;
+    }
+    footer { padding: 25px 0; background: var(--green-dark); color: #c4d2c9; }
+    .footer-inner { display: flex; align-items: center; justify-content: space-between; gap: 20px; font-size: 12px; }
+    footer a { color: var(--lime); text-decoration: none; }
+    .privacy-note { margin: 13px 0 0; color: #a9bbb0; font-size: 11px; }
+
+    @media (max-width: 760px) {
+      .hero-grid, .erd-grid { grid-template-columns: 1fr; gap: 30px; }
+      .hero { padding: 62px 0 56px; }
+      .hero-card { max-width: 500px; }
+      .overview-grid, .query-grid { grid-template-columns: 1fr 1fr; }
+      .section-heading { align-items: start; flex-direction: column; gap: 10px; }
+      .toolkit { grid-template-columns: 1fr; }
+      nav { gap: 12px; }
+      nav a { font-size: 12px; }
+    }
+    @media (max-width: 480px) {
+      .wrap { width: min(100% - 28px, 1120px); }
+      .topbar-inner { min-height: 60px; }
+      nav { gap: 9px; }
+      nav a { font-size: 11px; }
+      .overview-grid, .query-grid { grid-template-columns: 1fr; }
+      .overview-card { min-height: 0; }
+      .query-card p { min-height: 0; }
+      .file-links { grid-template-columns: 1fr; }
+      .footer-inner { align-items: start; flex-direction: column; }
+      .panel { padding: 19px; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior: auto; }
+      *, *::before, *::after { transition-duration: .01ms !important; }
+    }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="wrap topbar-inner">
+      <a class="brand" href="#" aria-label="Schoolbase home">
+        <span class="brand-mark" aria-hidden="true">S</span>
+        <span>Schoolbase <span style="color:#9eaf9f;font-weight:500">/ data design</span></span>
+      </a>
+      <nav aria-label="Main navigation">
+        <a href="#design">Design</a>
+        <a href="#queries">Queries</a>
+        <a href="#toolkit">Toolkit</a>
+        <a href="#export">Export</a>
+      </nav>
+    </div>
+  </header>
+
+  <section class="hero">
+    <div class="wrap hero-grid">
+      <div>
+        <span class="eyebrow">MySQL · MariaDB · InnoDB</span>
+        <h1>A clearer foundation for school data.</h1>
+        <p class="hero-copy">A practical secondary-school database design, from a normalized ERD to sample Nigerian school data, useful reports, and integrity patterns.</p>
+        <div class="actions">
+          <a class="button primary" href="https://github.com/Yakubu-Yusuf13/swd-projects" target="_blank" rel="noopener noreferrer">Explore the repository <span aria-hidden="true">↗</span></a>
+          <a class="button" href="#design">Explore the design <span aria-hidden="true">↓</span></a>
+        </div>
+      </div>
+      <aside class="hero-card" aria-label="Project at a glance">
+        <span class="card-label">The sample dataset</span>
+        <h2>Built to learn by querying.</h2>
+        <div class="stat-list">
+          <div class="stat"><strong>30</strong><span>students</span></div>
+          <div class="stat"><strong>3</strong><span>classes</span></div>
+          <div class="stat"><strong>240</strong><span>subject results</span></div>
+          <div class="stat"><strong>150</strong><span>attendance entries</span></div>
+        </div>
+      </aside>
+    </div>
+  </section>
+
+  <main class="wrap">
+    <section aria-labelledby="overview-title">
+      <div class="section-heading">
+        <div><span class="section-tag">01 / Overview</span><h2 id="overview-title">The school, represented simply.</h2></div>
+        <p>Keep people, classes, subjects, and academic records in the right place. Connect them through explicit relationships.</p>
+      </div>
+      <div class="overview-grid">
+        <article class="overview-card"><span class="icon" aria-hidden="true">01</span><h3>One source of truth</h3><p>Student and teacher details are stored once; enrollments and offerings connect them to each term's learning.</p></article>
+        <article class="overview-card"><span class="icon" aria-hidden="true">02</span><h3>Term-aware records</h3><p>Students are enrolled into classes per term, preserving progression and historical class placement.</p></article>
+        <article class="overview-card"><span class="icon" aria-hidden="true">03</span><h3>Integrity built in</h3><p>Keys, score checks, unique daily attendance, and class/term result validation keep records consistent.</p></article>
+      </div>
+    </section>
+
+    <section class="design" id="design" aria-labelledby="design-title">
+      <div class="section-heading">
+        <div><span class="section-tag">02 / Data model</span><h2 id="design-title">A normalized model with clear links.</h2></div>
+        <p>Enrollment and class-subject offerings resolve the many-to-many relationships without duplicating student, teacher, or subject details.</p>
+      </div>
+      <div class="panel">
+        <div class="erd-grid">
+          <div>
+            <h3>Core entities</h3>
+            <div class="entity-list" aria-label="Database entities">
+              <span class="entity">students</span><span class="entity">teachers</span>
+              <span class="entity">school_classes</span><span class="entity">subjects</span>
+              <span class="entity">terms</span><span class="entity">enrollments</span>
+              <span class="entity">class_subject_offerings</span><span class="entity">results</span>
+              <span class="entity">attendance</span>
+            </div>
+            <div class="erd-note"><strong>Integrity rule:</strong> A result's enrollment and subject offering must belong to the same class and term. Triggers enforce this without repeating class and term columns in each result.</div>
+          </div>
+          <div>
+            <h3>Relationships</h3>
+            <ul class="relationship-list">
+              <li><b>1:N</b><span>Teacher → form classes and subject offerings</span></li>
+              <li><b>1:N</b><span>Student → term enrollments → class placements</span></li>
+              <li><b>M:N</b><span>Classes ↔ subjects, resolved by class subject offerings</span></li>
+              <li><b>1:N</b><span>Enrollment and offering → student subject results</span></li>
+              <li><b>1:N</b><span>Student → daily attendance records</span></li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="queries" id="queries" aria-labelledby="queries-title">
+      <div class="section-heading">
+        <div><span class="section-tag">03 / Reporting</span><h2 id="queries-title">Turn records into useful answers.</h2></div>
+        <p>Examples use real reporting patterns: rank students fairly, filter aggregated results, and calculate attendance transparently.</p>
+      </div>
+      <div class="query-grid">
+        <article class="panel query-card">
+          <span class="query-number">QUERY 03</span>
+          <h3>Rank students in class</h3>
+          <p>Aggregate each student's subject totals, then restart ranking for every class and term. Equal averages share the same position.</p>
+          <span class="technique">Window · RANK</span>
+        </article>
+        <article class="panel query-card">
+          <span class="query-number">QUERY 05</span>
+          <h3>Find repeated subject failures</h3>
+          <p>Count scores below 40 per student. <code>HAVING</code> filters after grouping, so it can test the number of failed subjects.</p>
+          <span class="technique">GROUP BY · HAVING</span>
+        </article>
+        <article class="panel query-card">
+          <span class="query-number">QUERY 07</span>
+          <h3>Check attendance below 80%</h3>
+          <p>A left join keeps students without attendance rows in view. Present and late count as attended; the denominator is recorded days.</p>
+          <span class="technique">LEFT JOIN · Derived table</span>
+        </article>
+      </div>
+    </section>
+
+    <section class="toolkit" id="toolkit" aria-label="Database toolkit">
+      <article class="panel">
+        <span class="section-tag">04 / Integrity &amp; speed</span>
+        <h3>Scores, grades, and safe writes.</h3>
+        <p>CA is capped at 40 and exam at 60. The sample grade bands are illustrative and can be adapted to school policy.</p>
+        <div class="grade-row" aria-label="Illustrative grade bands">
+          <div class="grade"><b>A</b><span>80–100</span></div><div class="grade"><b>B</b><span>70–79</span></div>
+          <div class="grade"><b>C</b><span>60–69</span></div><div class="grade"><b>D</b><span>50–59</span></div>
+          <div class="grade"><b>E</b><span>40–49</span></div><div class="grade"><b>F</b><span>0–39</span></div>
+        </div>
+        <p style="margin:18px 0 0">`sp_record_result` validates the enrollment and offering, then upserts scores. The transfer procedure records an audit row and rolls back if validation fails.</p>
+      </article>
+      <article class="panel">
+        <span class="section-tag">05 / Get started</span>
+        <h3>Load the sample database.</h3>
+        <p>Run the files from the repository folder in this order. The seed contains fictional sample records.</p>
+        <pre><code>mysql -u root &lt; schema.sql
+mysql -u root &lt; seed.sql
+mysql -u root &lt; indexes.sql
+mysql -u root &lt; queries.sql
+mysql -u root &lt; procedures.sql
+mysql -u root &lt; transactions.sql</code></pre>
+        <div class="file-links" aria-label="Database source files">
+          <a class="file-link" href="https://github.com/Yakubu-Yusuf13/swd-projects/blob/main/08-school-database/schema.sql" target="_blank" rel="noopener noreferrer">schema.sql <span>tables &amp; rules ↗</span></a>
+          <a class="file-link" href="https://github.com/Yakubu-Yusuf13/swd-projects/blob/main/08-school-database/seed.sql" target="_blank" rel="noopener noreferrer">seed.sql <span>sample data ↗</span></a>
+          <a class="file-link" href="https://github.com/Yakubu-Yusuf13/swd-projects/blob/main/08-school-database/queries.sql" target="_blank" rel="noopener noreferrer">queries.sql <span>reports &amp; views ↗</span></a>
+          <a class="file-link" href="https://github.com/Yakubu-Yusuf13/swd-projects/blob/main/08-school-database/indexes.sql" target="_blank" rel="noopener noreferrer">indexes.sql <span>query plans ↗</span></a>
+          <a class="file-link" href="https://github.com/Yakubu-Yusuf13/swd-projects/blob/main/08-school-database/procedures.sql" target="_blank" rel="noopener noreferrer">procedures.sql <span>result upsert ↗</span></a>
+          <a class="file-link" href="https://github.com/Yakubu-Yusuf13/swd-projects/blob/main/08-school-database/transactions.sql" target="_blank" rel="noopener noreferrer">transactions.sql <span>audited transfer ↗</span></a>
+        </div>
+      </article>
+    </section>
+
+    <section class="export" id="export" aria-labelledby="export-title">
+      <div class="section-heading">
+        <div><span class="section-tag">06 / Backup</span><h2 id="export-title">Take the database with you.</h2></div>
+        <p>Exporting structure and data produces a portable SQL backup that can be restored in phpMyAdmin.</p>
+      </div>
+      <div class="panel">
+        <ol class="export-list">
+          <li><span>In phpMyAdmin, select <strong>swd_school</strong> in the left navigation, then open <strong>Export</strong>.</span></li>
+          <li><span>Choose <strong>Custom</strong> and <strong>SQL</strong>; select all tables and include both structure and data.</span></li>
+          <li><span>Include views, triggers, and routines if those export options are available. Choose <strong>Save output to a file</strong> and click <strong>Go</strong>.</span></li>
+          <li><span>Save the download as <code>database.sql</code>. To restore it, select a target database, open <strong>Import</strong>, choose the file, and click <strong>Go</strong>.</span></li>
+        </ol>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="wrap footer-inner">
+      <span>Schoolbase <span style="color:#8da198">· A database learning project</span></span>
+      <a href="https://github.com/Yakubu-Yusuf13/swd-projects" target="_blank" rel="noopener noreferrer">View source repository ↗</a>
+    </div>
+    <div class="wrap"><p class="privacy-note">Sample student and guardian details are fictional. This static demo does not connect to or expose the school database.</p></div>
+  </footer>
+</body>
+</html>
