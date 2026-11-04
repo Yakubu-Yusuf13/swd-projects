@@ -9,81 +9,68 @@ if (PHP_SAPI !== 'cli') {
 require __DIR__ . '/app/bootstrap.php';
 
 $products = [
-    ['phones', 'Samsung Galaxy A55', 'A bright, smooth display and dependable all-day performance make this 5G phone a practical everyday upgrade.', 529900, 12],
-    ['phones', 'Apple iPhone 15', 'A refined iPhone with a vibrant display, capable camera system and convenient USB-C charging.', 1199900, 8],
-    ['phones', 'Xiaomi Redmi Note 13 Pro', 'Enjoy a crisp high-resolution screen, fast charging and a versatile camera in a great-value package.', 429900, 16],
-    ['phones', 'TECNO Camon 30', 'Capture everyday moments with a stylish phone designed for clear portraits, smooth browsing and reliable battery life.', 319900, 14],
-    ['phones', 'Google Pixel 8a', 'A compact, helpful smartphone with a clean Android experience and smart camera features.', 699900, 0],
-    ['laptops', 'Lenovo IdeaPad Slim 3', 'A lightweight everyday laptop suited to study, home office tasks and streaming on the go.', 749900, 9],
-    ['laptops', 'HP Pavilion 15', 'A versatile 15-inch laptop with a comfortable keyboard for work, learning and entertainment.', 989900, 6],
-    ['laptops', 'Dell Inspiron 14', 'A portable and dependable laptop with a compact display size for getting things done anywhere.', 879900, 7],
-    ['laptops', 'Apple MacBook Air M2', 'A slim, quiet laptop with a vivid display and efficient performance for everyday creative work.', 1899900, 4],
-    ['laptops', 'ASUS VivoBook 15', 'A practical, full-size notebook for browsing, productivity and keeping up with your daily tasks.', 829900, 10],
-    ['accessories', 'Anker 20,000mAh Power Bank', 'Keep your devices topped up while travelling with a high-capacity portable charger.', 54900, 25],
-    ['accessories', 'Logitech M185 Wireless Mouse', 'A compact wireless mouse with a simple plug-and-play receiver for home or office.', 18900, 32],
-    ['accessories', 'JBL Tune 520BT Headphones', 'Enjoy wireless listening and a comfortable over-ear fit for commutes, calls and downtime.', 64900, 18],
-    ['accessories', '65W USB-C Fast Charger', 'A compact USB-C wall charger for powering compatible phones, tablets and laptops.', 27900, 30],
-    ['accessories', 'UGREEN 6-in-1 USB-C Hub', 'Add useful ports to your USB-C laptop with a handy hub for displays, storage and accessories.', 45900, 0],
+    ['phones', 'Samsung Galaxy A55', 'samsung-galaxy-a55', 'A vibrant 6.6-inch display, dependable all-day battery and a versatile camera system in a sleek, durable design.', 579900, 12],
+    ['phones', 'Apple iPhone 15', 'apple-iphone-15', 'Capture crisp photos, enjoy a bright Super Retina display and stay connected with the powerful A16 Bionic chip.', 1199900, 8],
+    ['phones', 'Xiaomi Redmi Note 13 Pro', 'xiaomi-redmi-note-13-pro', 'A sharp AMOLED display and a high-resolution camera make this a capable everyday phone at a great value.', 469900, 16],
+    ['phones', 'TECNO Camon 30', 'tecno-camon-30', 'A stylish phone with a vivid screen, portrait-friendly camera and plenty of power for your daily apps.', 349900, 14],
+    ['phones', 'Google Pixel 8a', 'google-pixel-8a', 'Enjoy Google AI features, a brilliant camera and a smooth, clean Android experience in a pocket-friendly phone.', 799900, 0],
+    ['laptops', 'Lenovo IdeaPad Slim 3', 'lenovo-ideapad-slim-3', 'A lightweight everyday laptop with a comfortable keyboard, clear display and the performance for study or work.', 729900, 9],
+    ['laptops', 'HP Pavilion 15', 'hp-pavilion-15', 'A versatile 15-inch laptop with a spacious screen and reliable performance for home, office and entertainment.', 899900, 6],
+    ['laptops', 'Dell Inspiron 14', 'dell-inspiron-14', 'Take your work anywhere with a compact 14-inch design, responsive performance and a crisp Full HD display.', 949900, 7],
+    ['laptops', 'Apple MacBook Air M2', 'apple-macbook-air-m2', 'A remarkably thin and quiet laptop with Apple silicon speed, all-day battery life and a beautiful Retina display.', 1899900, 4],
+    ['laptops', 'ASUS VivoBook 15', 'asus-vivobook-15', 'A practical, colorful 15-inch laptop that makes everyday productivity, browsing and streaming feel effortless.', 769900, 10],
+    ['accessories', 'Anker 20,000mAh Power Bank', 'anker-20-000mah-power-bank', 'Keep your devices charged on the go with generous capacity, fast charging and a travel-friendly design.', 45900, 25],
+    ['accessories', 'Logitech M185 Wireless Mouse', 'logitech-m185-wireless-mouse', 'A comfortable, dependable wireless mouse with simple plug-and-play setup and a long-lasting battery.', 14900, 32],
+    ['accessories', 'JBL Tune 520BT Headphones', 'jbl-tune-520bt-headphones', 'Enjoy bold JBL sound, wireless freedom and a lightweight foldable design for music wherever you go.', 54900, 18],
+    ['accessories', '65W USB-C Fast Charger', '65w-usb-c-fast-charger', 'A compact USB-C wall charger that delivers fast, efficient power for compatible phones, tablets and laptops.', 24900, 30],
+    ['accessories', 'UGREEN 6-in-1 USB-C Hub', 'ugreen-6-in-1-usb-c-hub', 'Expand your laptop connectivity with a handy collection of USB, HDMI and card-reader ports in one hub.', 38900, 0],
 ];
 
-$pdo = db();
-$pdo->beginTransaction();
+$categoryStatement = $pdo->prepare('SELECT id FROM categories WHERE slug = :slug LIMIT 1');
+$insertProduct = $pdo->prepare(
+    'INSERT INTO products (category_id, name, slug, description, price, stock, image_url, is_active)
+     VALUES (:category_id, :name, :slug, :description, :price, :stock, :image_url, 1)
+     ON DUPLICATE KEY UPDATE
+        category_id = VALUES(category_id),
+        name = VALUES(name),
+        description = VALUES(description),
+        price = VALUES(price),
+        stock = VALUES(stock),
+        image_url = VALUES(image_url),
+        is_active = 1'
+);
 
 try {
-    $categoryInsert = $pdo->prepare('INSERT IGNORE INTO categories (name, slug) VALUES (:name, :slug)');
-    foreach (['phones' => 'Phones', 'laptops' => 'Laptops', 'accessories' => 'Accessories'] as $slug => $name) {
-        $categoryInsert->execute(['name' => $name, 'slug' => $slug]);
-    }
+    $pdo->beginTransaction();
+    $categoryIds = [];
 
-    $categoryIds = $pdo->query('SELECT slug, id FROM categories')->fetchAll(PDO::FETCH_KEY_PAIR);
-    $findProduct = $pdo->prepare('SELECT id FROM products WHERE slug = :slug');
-    $insertProduct = $pdo->prepare(
-        'INSERT INTO products (category_id, name, slug, description, price, stock, image_url, is_active)
-         VALUES (:category_id, :name, :slug, :description, :price, :stock, :image_url, 1)'
-    );
-    $updateProduct = $pdo->prepare(
-        'UPDATE products
-         SET category_id = :category_id, name = :name, description = :description, price = :price,
-             stock = :stock, image_url = :image_url, is_active = 1
-         WHERE id = :id'
-    );
-
-    foreach ($products as [$categorySlug, $name, $description, $price, $stock]) {
-        $categoryId = $categoryIds[$categorySlug] ?? null;
-        if ($categoryId === null) {
-            throw new RuntimeException("Required category is missing: {$categorySlug}");
+    foreach ($products as [$categorySlug, $name, $slug, $description, $price, $stock]) {
+        if (!isset($categoryIds[$categorySlug])) {
+            $categoryStatement->execute(['slug' => $categorySlug]);
+            $categoryId = $categoryStatement->fetchColumn();
+            if ($categoryId === false) {
+                throw new RuntimeException('Required category not found: ' . $categorySlug);
+            }
+            $categoryIds[$categorySlug] = (int) $categoryId;
         }
 
-        $slug = strtolower(trim((string) preg_replace('/[^a-z0-9]+/i', '-', $name), '-'));
-        $values = [
-            'category_id' => (int) $categoryId,
+        $insertProduct->execute([
+            'category_id' => $categoryIds[$categorySlug],
             'name' => $name,
             'slug' => $slug,
             'description' => $description,
-            'price' => number_format($price / 100, 2, '.', ''),
+            'price' => number_format($price, 2, '.', ''),
             'stock' => $stock,
             'image_url' => 'https://placehold.co/600x400?text=' . rawurlencode($name),
-        ];
-
-        $findProduct->execute(['slug' => $slug]);
-        $existingId = $findProduct->fetchColumn();
-
-        if ($existingId === false) {
-            $insertProduct->execute($values);
-        } else {
-            $updateValues = $values;
-            unset($updateValues['slug']);
-            $updateValues['id'] = (int) $existingId;
-            $updateProduct->execute($updateValues);
-        }
+        ]);
     }
 
     $pdo->commit();
-    fwrite(STDOUT, 'Seed complete: ' . count($products) . " products are ready.\n");
+    fwrite(STDOUT, 'Seeded ' . count($products) . " products.\n");
 } catch (Throwable $exception) {
     if ($pdo->inTransaction()) {
         $pdo->rollBack();
     }
-
-    throw $exception;
+    fwrite(STDERR, 'Seeding failed: ' . $exception->getMessage() . "\n");
+    exit(1);
 }

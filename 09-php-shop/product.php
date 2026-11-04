@@ -1,84 +1,105 @@
 <?php
 declare(strict_types=1);
 
-require __DIR__ . '/app/bootstrap.php';
 require __DIR__ . '/app/cart.php';
 
 $slug = isset($_GET['slug']) && is_string($_GET['slug']) ? trim($_GET['slug']) : '';
-$statement = db()->prepare(
-    'SELECT p.id, p.name, p.slug, p.description, p.price, p.stock, p.image_url, c.name AS category_name
+$productStatement = $pdo->prepare(
+    'SELECT p.id, p.name, p.slug, p.description, p.price, p.stock, p.image_url,
+            c.name AS category_name
      FROM products p
      INNER JOIN categories c ON c.id = p.category_id
-     WHERE p.slug = :slug AND p.is_active = 1
+     WHERE p.slug = :slug AND p.is_active = :active
      LIMIT 1'
 );
-$statement->execute(['slug' => $slug]);
-$product = $statement->fetch();
+$productStatement->execute(['slug' => $slug, 'active' => 1]);
+$product = $productStatement->fetch();
 
 if (!$product) {
     http_response_code(404);
-}
-
-if ($product && $_SERVER['REQUEST_METHOD'] === 'POST') {
-    verify_csrf();
-    $quantity = filter_var($_POST['quantity'] ?? null, FILTER_VALIDATE_INT);
-
-    if ($quantity === false || $quantity < 1) {
-        cart_notice('Choose a valid quantity.', 'error');
-    } else {
-        cart_add((int) $product['id'], $quantity);
-    }
-
-    header('Location: ' . url('product.php') . '?slug=' . rawurlencode($product['slug']), true, 303);
+    $pageTitle = 'Product not found';
+    require __DIR__ . '/partials/header.php';
+    ?>
+    <section class="not-found section-wrap">
+        <p class="eyebrow">404 · NOT FOUND</p>
+        <h1>That product isn’t here.</h1>
+        <p>It may have moved or is no longer available.</p>
+        <a class="button button-dark" href="<?= e(BASE_URL) ?>/">Back to the shop</a>
+    </section>
+    <?php
+    require __DIR__ . '/partials/footer.php';
     exit;
 }
 
-$notice = $_SESSION['cart_notice'] ?? null;
-$noticeType = $_SESSION['cart_notice_type'] ?? 'success';
-unset($_SESSION['cart_notice'], $_SESSION['cart_notice_type']);
+if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
+    if (!csrf_is_valid($_POST['csrf_token'] ?? null)) {
+        http_response_code(400);
+        set_flash('error', 'Your session could not be verified. Please try adding the item again.');
+    } else {
+        $quantityValue = $_POST['quantity'] ?? null;
+        $quantity = is_scalar($quantityValue)
+            ? filter_var($quantityValue, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]])
+            : false;
 
-$pageTitle = $product ? $product['name'] : 'Product not found';
+        if ($quantity === false) {
+            set_flash('error', 'Choose a valid quantity to add to your cart.');
+        } else {
+            cart_add((int) $product['id'], $quantity);
+        }
+    }
+
+    header('Location: ' . BASE_URL . '/product.php?slug=' . rawurlencode($product['slug']), true, 303);
+    exit;
+}
+
+$pageTitle = $product['name'];
+$imageUrl = $product['image_url'] ?: 'https://placehold.co/600x400?text=' . rawurlencode($product['name']);
 require __DIR__ . '/partials/header.php';
 ?>
-<?php if (!$product): ?>
-    <div class="empty-state" style="margin: 48px 0">
-        <h1>Product not found</h1>
-        <p>This product may be unavailable or the link may have changed.</p>
-        <p><a class="button" href="<?= e(url()) ?>">Back to shop</a></p>
-    </div>
-<?php else: ?>
+<section class="product-detail section-wrap">
     <nav class="breadcrumbs" aria-label="Breadcrumb">
-        <a href="<?= e(url()) ?>">Shop</a><span aria-hidden="true">/</span><span><?= e($product['category_name']) ?></span>
+        <a href="<?= e(BASE_URL) ?>/">Shop</a>
+        <span aria-hidden="true">/</span>
+        <span><?= e($product['category_name']) ?></span>
     </nav>
-    <article class="product-detail">
-        <div class="detail-image-wrap">
-            <img class="detail-image" src="<?= e($product['image_url'] ?: 'https://placehold.co/600x400?text=Everyday+Shop') ?>" alt="<?= e($product['name']) ?>">
+    <div class="detail-layout">
+        <div class="detail-image">
+            <img src="<?= e($imageUrl) ?>" alt="<?= e($product['name']) ?>">
+            <?php if ((int) $product['stock'] < 1): ?>
+                <span class="stock-badge">Out of stock</span>
+            <?php endif; ?>
         </div>
         <div class="detail-copy">
             <p class="eyebrow"><?= e($product['category_name']) ?></p>
             <h1><?= e($product['name']) ?></h1>
             <p class="detail-price"><?= e(money($product['price'])) ?></p>
-            <p class="detail-description"><?= e($product['description']) ?></p>
-            <?php if ((int) $product['stock'] > 0): ?>
-                <p class="stock-status"><?= (int) $product['stock'] ?> in stock</p>
-            <?php else: ?>
-                <p class="stock-status out">Out of stock</p>
-            <?php endif; ?>
-
-            <?php if ($notice !== null): ?>
-                <p class="notice <?= $noticeType === 'error' ? 'error' : '' ?>" role="status"><?= e($notice) ?></p>
-            <?php endif; ?>
-
-            <form class="add-form" method="post" action="<?= e(url('product.php')) ?>?slug=<?= rawurlencode($product['slug']) ?>">
+            <p class="detail-description"><?= nl2br(e($product['description'])) ?></p>
+            <p class="stock-note <?= (int) $product['stock'] < 1 ? 'stock-note-out' : '' ?>">
+                <?= (int) $product['stock'] > 0
+                    ? (int) $product['stock'] . ' in stock'
+                    : 'Currently unavailable' ?>
+            </p>
+            <form class="add-to-cart-form" method="post" action="<?= e(BASE_URL) ?>/product.php?slug=<?= rawurlencode($product['slug']) ?>">
                 <?= csrf_field() ?>
-                <div class="field quantity-field">
-                    <label for="quantity">Quantity</label>
-                    <input class="quantity-input" id="quantity" name="quantity" type="number" min="1" max="<?= (int) $product['stock'] ?>" value="1" required <?= (int) $product['stock'] < 1 ? 'disabled' : '' ?>>
+                <label for="quantity">Quantity</label>
+                <div class="purchase-controls">
+                    <input
+                        id="quantity"
+                        name="quantity"
+                        type="number"
+                        value="1"
+                        min="1"
+                        max="<?= (int) $product['stock'] ?>"
+                        required
+                        <?= (int) $product['stock'] < 1 ? 'disabled' : '' ?>
+                    >
+                    <button class="button button-green add-button" type="submit" <?= (int) $product['stock'] < 1 ? 'disabled' : '' ?>>
+                        Add to cart <span aria-hidden="true">→</span>
+                    </button>
                 </div>
-                <button class="button" type="submit" <?= (int) $product['stock'] < 1 ? 'disabled' : '' ?>>Add to cart</button>
-                <a class="button button-secondary" href="<?= e(url()) ?>">Continue shopping</a>
             </form>
+            <p class="secure-note"><span aria-hidden="true">✓</span> Carefully selected tech, ready for you.</p>
         </div>
-    </article>
-<?php endif; ?>
+    </div>
+</section>
 <?php require __DIR__ . '/partials/footer.php'; ?>

@@ -3,124 +3,132 @@ declare(strict_types=1);
 
 require __DIR__ . '/app/cart.php';
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    verify_csrf();
-    $action = isset($_POST['action']) && is_string($_POST['action']) ? $_POST['action'] : '';
-    $id = filter_var($_POST['product_id'] ?? null, FILTER_VALIDATE_INT);
-
-    if ($action === 'update' && $id !== false) {
-        $quantity = filter_var($_POST['quantity'] ?? null, FILTER_VALIDATE_INT);
-        if ($quantity === false) {
-            cart_notice('Enter a valid quantity.', 'error');
-        } else {
-            cart_update($id, $quantity);
-        }
-    } elseif ($action === 'remove' && $id !== false) {
-        cart_remove($id);
-    } elseif ($action === 'clear') {
-        cart_clear();
-    } elseif ($action === 'checkout') {
-        cart_notice('Checkout is not available yet.', 'error');
-    } else {
-        cart_notice('That cart action is not valid.', 'error');
+if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
+    if (!csrf_is_valid($_POST['csrf_token'] ?? null)) {
+        http_response_code(400);
+        set_flash('error', 'Your session could not be verified. Please try again.');
+        header('Location: ' . BASE_URL . '/cart.php', true, 303);
+        exit;
     }
 
-    header('Location: ' . url('cart.php'), true, 303);
+    $action = isset($_POST['action']) && is_string($_POST['action']) ? $_POST['action'] : '';
+    $productId = isset($_POST['product_id'])
+        ? filter_var($_POST['product_id'], FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]])
+        : false;
+
+    if ($action === 'clear') {
+        cart_clear();
+        set_flash('success', 'Your cart has been emptied.');
+    } elseif ($productId === false) {
+        set_flash('error', 'The selected cart item is invalid.');
+    } elseif ($action === 'remove') {
+        cart_remove($productId);
+        set_flash('success', 'Item removed from your cart.');
+    } elseif ($action === 'update') {
+        $quantity = isset($_POST['quantity'])
+            ? filter_var($_POST['quantity'], FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]])
+            : false;
+        if ($quantity === false) {
+            set_flash('error', 'Enter a quantity of at least one, or remove the item.');
+        } else {
+            cart_update($productId, $quantity);
+        }
+    } else {
+        set_flash('error', 'Unknown cart action.');
+    }
+
+    header('Location: ' . BASE_URL . '/cart.php', true, 303);
     exit;
 }
 
 $items = cart_items();
 $total = cart_total();
-$notice = $_SESSION['cart_notice'] ?? null;
-$noticeType = $_SESSION['cart_notice_type'] ?? 'success';
-unset($_SESSION['cart_notice'], $_SESSION['cart_notice_type']);
-
 $pageTitle = 'Your cart';
 require __DIR__ . '/partials/header.php';
 ?>
-<section class="cart-page">
-    <div class="cart-page-heading">
+<section class="cart-page section-wrap">
+    <div class="section-heading cart-heading">
         <div>
-            <p class="eyebrow">Your selection</p>
-            <h1>Your shopping cart</h1>
+            <p class="eyebrow">YOUR PICKS, ALL IN ONE PLACE</p>
+            <h1>Your cart</h1>
         </div>
-        <a class="button button-secondary" href="<?= e(url()) ?>">Continue shopping</a>
+        <span class="result-count"><?= cart_count() ?> <?= cart_count() === 1 ? 'item' : 'items' ?></span>
     </div>
 
-    <?php if ($notice !== null): ?>
-        <p class="notice <?= $noticeType === 'error' ? 'error' : '' ?>" role="status"><?= e($notice) ?></p>
-    <?php endif; ?>
-
     <?php if ($items === []): ?>
-        <div class="empty-state cart-empty">
-            <h2>Your cart is empty</h2>
-            <p>Browse the shop and add something you like.</p>
-            <a class="button" href="<?= e(url()) ?>">Explore products</a>
+        <div class="empty-state">
+            <span class="empty-icon" aria-hidden="true">⌑</span>
+            <h2>Your cart is waiting</h2>
+            <p>When you find something you love, it’ll show up here.</p>
+            <a class="button button-dark" href="<?= e(BASE_URL) ?>/">Browse the shop</a>
         </div>
     <?php else: ?>
         <div class="cart-layout">
             <div class="cart-table-wrap">
                 <table class="cart-table">
                     <thead>
-                    <tr>
-                        <th scope="col">Product</th>
-                        <th scope="col">Price</th>
-                        <th scope="col">Quantity</th>
-                        <th scope="col">Total</th>
-                        <th scope="col"><span class="visually-hidden">Actions</span></th>
-                    </tr>
+                        <tr>
+                            <th scope="col">Product</th>
+                            <th scope="col">Price</th>
+                            <th scope="col">Quantity</th>
+                            <th scope="col">Total</th>
+                        </tr>
                     </thead>
                     <tbody>
-                    <?php foreach ($items as $item): ?>
-                        <tr>
-                            <td data-label="Product">
-                                <div class="cart-product">
-                                    <a class="cart-product-image" href="<?= e(url('product.php')) ?>?slug=<?= rawurlencode($item['slug']) ?>">
-                                        <img src="<?= e($item['image_url'] ?: 'https://placehold.co/600x400?text=Everyday+Shop') ?>" alt="">
+                        <?php foreach ($items as $item): ?>
+                            <?php $imageUrl = $item['image_url'] ?: 'https://placehold.co/600x400?text=' . rawurlencode($item['name']); ?>
+                            <tr>
+                                <td class="cart-product-cell">
+                                    <a class="cart-product-image" href="<?= e(BASE_URL) ?>/product.php?slug=<?= rawurlencode($item['slug']) ?>">
+                                        <img src="<?= e($imageUrl) ?>" alt="">
                                     </a>
-                                    <div>
-                                        <a class="cart-product-name" href="<?= e(url('product.php')) ?>?slug=<?= rawurlencode($item['slug']) ?>"><?= e($item['name']) ?></a>
-                                        <?php if (!$item['stock_ok']): ?>
-                                            <span class="cart-stock-warning">Quantity adjusted to current stock</span>
-                                        <?php endif; ?>
+                                    <div class="cart-product-info">
+                                        <a class="cart-product-name" href="<?= e(BASE_URL) ?>/product.php?slug=<?= rawurlencode($item['slug']) ?>"><?= e($item['name']) ?></a>
+                                        <span class="cart-stock"><?= (int) $item['stock'] ?> in stock</span>
                                     </div>
-                                </div>
-                            </td>
-                            <td data-label="Price"><?= e(money($item['price'])) ?></td>
-                            <td data-label="Quantity">
-                                <form class="cart-update-form" method="post" action="<?= e(url('cart.php')) ?>">
-                                    <?= csrf_field() ?>
-                                    <input type="hidden" name="action" value="update">
-                                    <input type="hidden" name="product_id" value="<?= (int) $item['id'] ?>">
-                                    <input class="quantity-input cart-quantity" type="number" name="quantity" min="1" max="<?= (int) $item['stock'] ?>" value="<?= (int) $item['quantity'] ?>" aria-label="Quantity for <?= e($item['name']) ?>" required>
-                                    <button class="text-button" type="submit">Update</button>
-                                </form>
-                            </td>
-                            <td data-label="Total" class="cart-line-total"><?= e(money($item['line_total'])) ?></td>
-                            <td data-label="Actions">
-                                <form method="post" action="<?= e(url('cart.php')) ?>">
-                                    <?= csrf_field() ?>
-                                    <input type="hidden" name="action" value="remove">
-                                    <input type="hidden" name="product_id" value="<?= (int) $item['id'] ?>">
-                                    <button class="text-button remove-button" type="submit">Remove</button>
-                                </form>
-                            </td>
-                        </tr>
-                    <?php endforeach; ?>
+                                </td>
+                                <td data-label="Price"><?= e(money($item['price'])) ?></td>
+                                <td data-label="Quantity">
+                                    <form class="cart-item-form" method="post" action="<?= e(BASE_URL) ?>/cart.php">
+                                        <?= csrf_field() ?>
+                                        <input type="hidden" name="product_id" value="<?= (int) $item['product_id'] ?>">
+                                        <div class="cart-quantity-control">
+                                            <input
+                                                aria-label="Quantity for <?= e($item['name']) ?>"
+                                                name="quantity"
+                                                type="number"
+                                                min="1"
+                                                max="<?= (int) $item['stock'] ?>"
+                                                value="<?= (int) $item['quantity'] ?>"
+                                                required
+                                            >
+                                            <button class="cart-action" type="submit" name="action" value="update">Update</button>
+                                        </div>
+                                        <button class="cart-action cart-remove" type="submit" name="action" value="remove">Remove</button>
+                                    </form>
+                                </td>
+                                <td class="cart-line-total" data-label="Total"><?= e(money($item['line_total'])) ?></td>
+                            </tr>
+                        <?php endforeach; ?>
                     </tbody>
                 </table>
-                <form class="clear-cart-form" method="post" action="<?= e(url('cart.php')) ?>">
-                    <?= csrf_field() ?>
-                    <input type="hidden" name="action" value="clear">
-                    <button class="text-button remove-button" type="submit">Clear cart</button>
-                </form>
             </div>
 
-            <aside class="cart-summary" aria-labelledby="summary-title">
-                <h2 id="summary-title">Order summary</h2>
-                <div class="summary-row"><span>Subtotal</span><strong><?= e(money($total)) ?></strong></div>
-                <p class="summary-note">Shipping and any applicable charges are calculated at checkout.</p>
-                <a class="button checkout-button" href="<?= e(url('checkout.php')) ?>">Proceed to checkout</a>
+            <aside class="cart-summary">
+                <p class="eyebrow">ORDER SUMMARY</p>
+                <div class="summary-row">
+                    <span>Subtotal</span>
+                    <strong><?= e(money($total)) ?></strong>
+                </div>
+                <p class="summary-note">Shipping and any applicable fees are calculated at checkout.</p>
+                <a class="button button-green checkout-button" href="<?= e(BASE_URL) ?>/checkout.php">
+                    Proceed to checkout <span aria-hidden="true">→</span>
+                </a>
+                <a class="continue-shopping" href="<?= e(BASE_URL) ?>/">Continue shopping</a>
+                <form method="post" action="<?= e(BASE_URL) ?>/cart.php">
+                    <?= csrf_field() ?>
+                    <button class="clear-cart" type="submit" name="action" value="clear">Clear cart</button>
+                </form>
             </aside>
         </div>
     <?php endif; ?>
